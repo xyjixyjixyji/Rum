@@ -18,12 +18,9 @@ impl Document {
         let contents = fs::read_to_string(filename)?;
         let mut rows = Vec::new();
         let filetype = FileType::from(filename);
-        let start_with_comment = false; // for multiline comments
 
         for value in contents.lines() {
-            let mut row = Row::from(value);
-            row.highlight(filetype.options(), None, start_with_comment);
-            rows.push(row);
+            rows.push(Row::from(value));
         }
         Ok(Self {
             rows,
@@ -49,7 +46,7 @@ impl Document {
             let row = &mut self.rows[at.y];
             row.insert(at.x, c);
         }
-        self.highlight(None);
+        self.unhighlight_rows(at.y);
     }
 
     pub fn insert_newline(&mut self, at: &Pos) {
@@ -82,7 +79,7 @@ impl Document {
             let row = &mut self.rows[at.y];
             row.delete(at.x);
         }
-        self.highlight(None);
+        self.unhighlight_rows(at.y);
     }
 
     pub fn save(&mut self) -> Result<(), Error> {
@@ -92,7 +89,6 @@ impl Document {
             for row in &mut self.rows {
                 file.write_all(row.as_bytes())?;
                 file.write_all(b"\n")?;
-                row.highlight(self.filetype.options(), None);
             }
             self.dirty = false;
         }
@@ -135,9 +131,28 @@ impl Document {
         None
     }
 
-    pub fn highlight(&mut self, word: Option<&str>) {
-        for row in &mut self.rows {
-            row.highlight(self.filetype.options(), word);
+    pub fn highlight(&mut self, word: &Option<String>, until: Option<usize>) {
+        let mut start_with_comment = false;
+        let until = if let Some(until) = until {
+            if until.saturating_add(1) < self.rows.len() {
+                until.saturating_add(1)
+            } else {
+                self.rows.len()
+            }
+        } else {
+            self.rows.len()
+        };
+        for row in &mut self.rows[..until] {
+            start_with_comment = row.highlight(
+                &self.filetype.options(),
+                word,
+                start_with_comment);
+        }
+    }
+
+    fn unhighlight_rows(&mut self, start: usize) {
+        for row in self.rows.iter_mut().skip(start.saturating_sub(1)) {
+            row.is_highlighted = false;
         }
     }
 

@@ -6,9 +6,10 @@ u8 u16 i32
 a as n
 aaassss
 dddfgwet
- sdadsa     weqweqweqw
+as as in sdadsa     weqweqweqw
 ewqeqw heqwjkeh kqiweoqwe
-
+/* asdashda sh
+*/
 safhkiashfoqwhoi qwejioqwjeiojoqw
 
 qwjeioqwjioejqiow  hiohqiowhiryqwioroq
