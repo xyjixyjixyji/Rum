@@ -1,4 +1,5 @@
 use crate::{document::Document, Row, Terminal};
+use crate::modes::mode::Mode;
 use std::env;
 use std::time::Duration;
 use std::time::Instant;
@@ -38,6 +39,7 @@ impl From<String> for StatusMessage {
 }
 
 pub struct Editor {
+    mode: Mode,
     quit: bool,
     terminal: Terminal,
     cursor_pos: Pos,
@@ -65,6 +67,7 @@ impl Editor {
         };
 
         Self {
+            mode: Mode::Normal,
             quit: false,
             terminal: Terminal::default().expect("Failed to initialize terminal"),
             cursor_pos: Pos::default(),
