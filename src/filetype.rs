@@ -102,6 +102,7 @@ impl From<&str> for FileType {
                         "usize".to_owned(),
                         "f32".to_owned(),
                         "f64".to_owned(),
+                        "String".to_owned(),
                     ],
                 },
             };

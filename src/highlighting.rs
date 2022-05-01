@@ -13,13 +13,13 @@ pub enum Type {
     SecondaryKeywords,
 }
 
-const COLOR_NUMBER: color::Rgb = color::Rgb(220, 163, 163);
+const COLOR_NUMBER: color::Rgb = color::Rgb(255, 222, 173);
 const COLOR_MATCH: color::Rgb = color::Rgb(38, 139, 210);
 const COLOR_STRING: color::Rgb = color::Rgb(211, 54, 130);
 const COLOR_CHAR: color::Rgb = color::Rgb(108, 113, 196);
-const COLOR_COMMENT: color::Rgb = color::Rgb(133, 153, 0);
-const COLOR_PRIMARYKW: color::Rgb = color::Rgb(181, 137, 0);
-const COLOR_SECONDARYKW: color::Rgb = color::Rgb(42, 161, 152);
+const COLOR_COMMENT: color::Rgb = color::Rgb(46, 139, 87);
+const COLOR_PRIMARYKW: color::Rgb = color::Rgb(221, 160, 221);
+const COLOR_SECONDARYKW: color::Rgb = color::Rgb(255, 250, 205);
 const COLOR_NOCOLOR: color::Rgb = color::Rgb(255, 255, 255);
 
 impl Type {

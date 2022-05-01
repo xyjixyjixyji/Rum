@@ -207,7 +207,7 @@ impl Row {
                 };
                 if let Some(closing_char) = chars.get(closing_index) {
                     if *closing_char == '\'' {
-                        for _ in 0..closing_index.saturating_sub(*index) {
+                        for _ in 0..=closing_index.saturating_sub(*index) {
                             self.highlighting.push(highlighting::Type::Character);
                             *index += 1;
                         }
