@@ -83,18 +83,17 @@ impl Row {
     pub fn delete(&mut self, at: usize) {
         if at >= self.len() {
             return;
-        } else {
-            let mut result: String = String::new();
-            let mut length = 0;
-            for (index, grapheme) in self.string[..].graphemes(true).enumerate() {
-                if index != at {
-                    length += 1;
-                    result.push_str(grapheme);
-                }
-            }
-            self.len = length;
-            self.string = result;
         }
+        let mut result: String = String::new();
+        let mut length = 0;
+        for (index, grapheme) in self.string[..].graphemes(true).enumerate() {
+            if index != at {
+                length += 1;
+                result.push_str(grapheme);
+            }
+        }
+        self.len = length;
+        self.string = result;
     }
 
     pub fn append(&mut self, new: &Self) {
@@ -419,10 +418,11 @@ impl Row {
         if self.is_highlighted && word.is_none() {
             if let Some(hl_type) = self.highlighting.last() {
                 if *hl_type == highlighting::Type::MultilineComment
-                    && self.string.len() > 1
-                    && self.string[self.string.len() - 2..] == *"*/"
                 {
-                    return true;
+                    let graphemes: String = self.string.graphemes(true).collect();
+                    if graphemes.len() > 1 && (graphemes[graphemes.len() - 2..] == *"*/") {
+                        return true;
+                    }
                 }
             }
             return false;
