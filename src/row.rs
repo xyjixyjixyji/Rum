@@ -51,11 +51,7 @@ impl Row {
                     parsed.push_str(&start_highlighting[..]);
                 }
 
-                if c == '\t' {
-                    parsed.push_str(&" ".repeat(4)); // tabsize = 4
-                } else {
-                    parsed.push(c);
-                }
+                parsed.push(c);
             }
         }
         let end_highlight = format!("{}", termion::color::Fg(color::Reset));
@@ -471,6 +467,17 @@ impl Row {
         }
         self.is_highlighted = true;
         false // we are out of the multiline comment
+    }
+
+    pub fn index_first_char(&self) -> usize {
+        let mut index = 0;
+        for (i, char) in self.string.chars().enumerate() {
+            if char != ' ' {
+                index = i;
+                break;
+            }
+        }
+        index
     }
 
     pub fn len(&self) -> usize {

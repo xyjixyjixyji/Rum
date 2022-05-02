@@ -8,6 +8,7 @@ use termion::cursor;
 
 const STATUS_FG_COLOR: color::Rgb = color::Rgb(63, 63, 63);
 const STATUS_BG_COLOR: color::Rgb = color::Rgb(239, 239, 239);
+const TABSIZE: usize = 4;
 const VERSION: &str = env!["CARGO_PKG_VERSION"];
 
 #[derive(PartialEq)]
@@ -421,8 +422,18 @@ impl Editor {
         let pressed_key = Terminal::read_key()?;
         match pressed_key {
             Key::Char(c) => {
-                self.document.insert(&self.cursor_pos, c);
-                self.move_cursor(Key::Right);
+                match c {
+                    '\t' => {
+                        for _ in 0..TABSIZE {
+                            self.document.insert(&self.cursor_pos, ' ');
+                            self.move_cursor(Key::Right);
+                        }
+                    }
+                    _ => {
+                        self.document.insert(&self.cursor_pos, c);
+                        self.move_cursor(Key::Right);
+                    }
+                }
             },
             Key::Delete => self.document.delete(&self.cursor_pos),
             Key::Backspace => {
@@ -469,6 +480,10 @@ impl Editor {
                 'v' => self.change_mode(Mode::Visual),
                 'h' | 'j' | 'k' | 'l' => self.normal_move_cursor(c),
                 'x' => self.document.delete(&self.cursor_pos),
+                's' => {
+                    self._normal_process_keypress(Key::Char('x'));
+                    self._normal_process_keypress(Key::Char('i'));
+                }
                 ':' => self.parse_command(),
                 '/' => self.search(),
                 'o' => {
@@ -481,8 +496,19 @@ impl Editor {
                     self.move_cursor(Key::Up);
                     self._normal_process_keypress(Key::Char('o'));
                 }
+                '^' => self.move_cursor_thisline_first_char(),
+                '\n' => {
+                }
                 _ => (),
             }
+            Key::Backspace => {
+                if self.cursor_pos.x == 0 {  // skip the newline
+                    self.move_cursor(Key::Left);
+                    self.move_cursor(Key::Left);
+                } else {
+                    self.move_cursor(Key::Left);
+                }
+           }
             _ => (),
         }
     }
@@ -529,6 +555,7 @@ impl Editor {
         }
     }
 
+    // if we are at the last char(newline) of a line, we move back
     fn fix_if_cursor_at_newline(&mut self) {
         let Pos {x, y} = self.cursor_pos;
         if let Some(row) = self.document.row(y) {
@@ -553,6 +580,14 @@ impl Editor {
     fn move_cursor_nextline_front(&mut self) {
         self.move_cursor_thisline_end();
         self.move_cursor(Key::Right); // to next line
+    }
+    
+    fn move_cursor_thisline_first_char(&mut self) {
+        let Pos {x, y} = self.cursor_pos;
+        if let Some(row) = self.document.row(y) {
+            let mut pos = &mut self.cursor_pos;
+            pos.x = row.index_first_char();
+        }
     }
 
 
