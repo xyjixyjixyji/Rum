@@ -56,7 +56,7 @@ pub struct Editor {
 
 impl Editor {
     pub fn default() -> Self {
-        let mut init_status = String::from("Help: | Ctrl-Q - quit | Ctrl-S - save |");
+        let mut init_status = String::from("");
         let args: Vec<String> = env::args().collect();
         let document = if let Some(filename) = args.get(1) {
             let doc = Document::open(filename);
@@ -207,16 +207,29 @@ impl Editor {
             self.highlighted_word = None;
     }
 
-    fn draw_welcome_message(&self) {
-        let mut msg = format!("Jim Editor -- version {}", VERSION);
+    fn draw_welcome_messages(&self) {
+        self.process_and_print_welcome_msg(format!("Rum Editor -- version {}", VERSION));
+        println!("~\r");
+        self.process_and_print_welcome_msg(format!("A Vim-like Editor completely in Rust"));
+        self.process_and_print_welcome_msg(format!("Rum is permanently free and open-source"));
+        println!("~\r");
+        self.process_and_print_welcome_msg(format!("Use: <:q> \t to <Exit>"));
+        self.process_and_print_welcome_msg(format!("Use: <:wq> \t to <Save>"));
+    }
+
+    fn process_and_print_welcome_msg(&self, msg: String) {
         let width = self.terminal.size().width as usize;
+
         let len = msg.len();
+
         #[allow(clippy::integer_arithmetic, clippy::integer_division)]
         let padding = width.saturating_sub(len) / 2;
         let spaces = " ".repeat(padding.saturating_sub(1));
-        msg = format!("~{}{}", spaces, msg);
-        msg.truncate(width);
-        println!("{}\r", msg);
+
+        let mut processed_msg = format!("~{}{}", spaces, msg);
+        processed_msg.truncate(width);
+
+        println!("{}\r", processed_msg);
     }
 
     fn draw_row(&self, row: &Row) {
@@ -237,8 +250,8 @@ impl Editor {
                 .row(self.offset.y.saturating_add(term_row as usize))
             {
                 self.draw_row(row);
-            } else if self.document.is_empty() && term_row == height / 3 {
-                self.draw_welcome_message();
+            } else if (term_row == height / 3) && self.document.is_empty() {
+                self.draw_welcome_messages();
             } else {
                 println!("~\r");
             }
@@ -432,9 +445,27 @@ impl Editor {
     // ========================================================
     fn normal_process_keypress(&mut self) -> Result<(), std::io::Error> {
         let pressed_key = Terminal::read_key()?;
+        self._normal_process_keypress(pressed_key);
+        Ok(())
+    }
+
+    // wrapped function, for recursive use
+    fn _normal_process_keypress(&mut self, pressed_key: Key) {
         match pressed_key {
             Key::Char(c) => match c {
                 'i' => self.change_mode(Mode::Insert),
+                'a' => {
+                    self.move_cursor(Key::Right);
+                    self.change_mode(Mode::Insert);
+                }
+                'A' => {
+                    self.move_cursor_thisline_end();
+                    self._normal_process_keypress(Key::Char('i'));
+                }
+                'I' => {
+                    self.move_cursor_thisline_front();
+                    self._normal_process_keypress(Key::Char('i'));
+                }
                 'v' => self.change_mode(Mode::Visual),
                 'h' | 'j' | 'k' | 'l' => self.normal_move_cursor(c),
                 'x' => self.document.delete(&self.cursor_pos),
@@ -446,11 +477,14 @@ impl Editor {
                         self.change_mode(Mode::Insert);
                     }
                 }
+                'O' => {
+                    self.move_cursor(Key::Up);
+                    self._normal_process_keypress(Key::Char('o'));
+                }
                 _ => (),
             }
             _ => (),
         }
-        Ok(())
     }
 
     fn normal_insert_newline(&mut self) -> bool {
@@ -469,43 +503,58 @@ impl Editor {
     fn normal_move_cursor(&mut self, c: char) {
         match c {
             'h' => {
+                // not allowing use h to move up a line
                 if self.cursor_pos.x != 0 {
                     self.move_cursor(Key::Left);
                 }
             }
             'j' => {
                 self.move_cursor(Key::Down);
-
-                // not allowing to navigate to \n
-                let Pos {x, y} = self.cursor_pos;
-                if x == self.document.row(y).unwrap().len() {
-                    self.normal_move_cursor('h');
-                }
+                self.fix_if_cursor_at_newline();  // not allowing to navigate to \n
             }
             'k' => {
                 self.move_cursor(Key::Up);
-                
-                let Pos {x, y} = self.cursor_pos;
-                if x == self.document.row(y).unwrap().len() {
-                    self.normal_move_cursor('h');
-                }
+                self.fix_if_cursor_at_newline();  // not allowing to navigate to \n
             }
             'l' => {
                 let Pos {x, y} = self.cursor_pos;
-                if x < self.document.row(y).unwrap().len().saturating_sub(1) {
-                    // we do not allow to navigate to \n
-                    self.move_cursor(Key::Right)
+                // we do not allow to navigate to \n
+                if let Some(row) = self.document.row(y) {
+                    if x < row.len().saturating_sub(1) {
+                        self.move_cursor(Key::Right)
+                    }
                 }
             }
             _ => (),
         }
     }
 
-    fn move_cursor_nextline_front(&mut self) {
-        let mut pos = &mut self.cursor_pos;
-        pos.x = 0;
-        pos.y = pos.y.saturating_add(1);
+    fn fix_if_cursor_at_newline(&mut self) {
+        let Pos {x, y} = self.cursor_pos;
+        if let Some(row) = self.document.row(y) {
+            if x == row.len() {
+                self.normal_move_cursor('h');
+            }
+        }
     }
+
+    fn move_cursor_thisline_end(&mut self) {
+        let mut pos = &mut self.cursor_pos;
+        if let Some(row) = self.document.row(pos.y) {
+            pos.x = row.len(); // we are at \n
+        }
+    }
+
+    fn move_cursor_thisline_front(&mut self) {
+        self.move_cursor_nextline_front();
+        self.move_cursor(Key::Up);
+    }
+
+    fn move_cursor_nextline_front(&mut self) {
+        self.move_cursor_thisline_end();
+        self.move_cursor(Key::Right); // to next line
+    }
+
 
     fn parse_command(&mut self) {
         let cmd = self
