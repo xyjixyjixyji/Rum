@@ -498,6 +498,8 @@ impl Editor {
                 }
                 '^' => self.move_cursor_thisline_first_char(),
                 '\n' => {
+                    self.move_cursor(Key::Down);
+                    self.move_cursor_thisline_first_char();
                 }
                 _ => (),
             }
@@ -583,10 +585,9 @@ impl Editor {
     }
     
     fn move_cursor_thisline_first_char(&mut self) {
-        let Pos {x, y} = self.cursor_pos;
+        let y = self.cursor_pos.y;
         if let Some(row) = self.document.row(y) {
-            let mut pos = &mut self.cursor_pos;
-            pos.x = row.index_first_char();
+            self.cursor_pos.x = row.index_first_char();
         }
     }
 
