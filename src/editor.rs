@@ -18,6 +18,16 @@ pub enum Mode {
     Insert,
 }
 
+impl Mode {
+    fn to_string(&self) -> String {
+        match self {
+            Mode::Normal => "-- Normal --".to_owned(),
+            Mode::Visual => "-- Visual --".to_owned(),
+            Mode::Insert => "-- Insert --".to_owned(),
+        }
+    }
+}
+
 #[derive(PartialEq, Clone, Copy)]
 pub enum SearchDirection {
     Forward,
@@ -273,6 +283,8 @@ impl Editor {
         if let Some(name) = &self.document.filename {
             filename = name.clone();
             #[allow(clippy::integer_arithmetic)]
+            let pos = filename.rfind('/').unwrap_or(0);
+            filename = filename[pos+1..].to_owned();
             filename.truncate(width / 4);
         }
         let dirty_status = if self.document.is_dirty() {
@@ -280,13 +292,22 @@ impl Editor {
         } else {
             ""
         };
+
+        let mode_status = self.mode.to_string();
+
         let line_status = format!(
-            "{} | {}/{}",
-            self.document.file_type(),
+            "line: {}/{}",
             self.cursor_pos.y.saturating_add(1),
             self.document.len()
         );
-        let mut status = format!("{} - line: {} {}", filename, line_status, dirty_status,);
+
+        let file_status = format!(
+            "{}[{}]",
+            filename,
+            self.document.file_type()
+        );
+
+        let mut status = format!("|{}| {} - {} {}", mode_status, file_status, line_status, dirty_status);
         status.push_str(&" ".repeat(width.saturating_sub(status.len())));
         status.truncate(width);
 
@@ -468,6 +489,7 @@ impl Editor {
     }
 
     // wrapped function, for recursive use
+    // TODO: function getting too long, try to split it into multiple functions
     fn _normal_process_keypress(&mut self, pressed_key: Key) {
         match pressed_key {
             Key::Char(c) => match c {
