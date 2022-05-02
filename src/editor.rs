@@ -10,7 +10,7 @@ const STATUS_FG_COLOR: color::Rgb = color::Rgb(63, 63, 63);
 const STATUS_BG_COLOR: color::Rgb = color::Rgb(239, 239, 239);
 const VERSION: &str = env!["CARGO_PKG_VERSION"];
 
-#[derive(Clone, Copy)]
+#[derive(PartialEq)]
 pub enum Mode {
     Normal,
     Visual,
@@ -63,7 +63,7 @@ impl Editor {
             if let Ok(doc) = doc {
                 doc
             } else {
-                init_status = format!("ERR: Failed to open file: {}", args[1]);
+                init_status = format!("ERR: Failed to open file: {}", filename);
                 Document::default()
             }
         } else {
@@ -73,6 +73,7 @@ impl Editor {
         Self {
             mode: Mode::Normal,
             quit: false,
+            #[allow(clippy::expect_used)]
             terminal: Terminal::default().expect("Failed to initialize terminal"),
             cursor_pos: Pos::default(),
             document,
@@ -168,7 +169,7 @@ impl Editor {
     }
 
     fn search(&mut self) {
-        let old_pos = self.cursor_pos.clone();
+        let old_pos = self.cursor_pos;
         let mut direction = SearchDirection::Forward;
         let query = self
             .prompt(
@@ -189,7 +190,7 @@ impl Editor {
                 if let Some(pos) =
                     editor
                         .document
-                        .find(&query, &editor.cursor_pos, direction)
+                        .find(query, &editor.cursor_pos, direction)
                         {
                             editor.cursor_pos = pos;
                             editor.scroll();
@@ -245,12 +246,12 @@ impl Editor {
     }
 
     fn draw_status_bar(&self) {
-        let mut status;
-        let mut filename = "[No Name]".to_string();
+        let mut filename = "[No Name]".to_owned();
         let width = self.terminal.size().width as usize;
 
         if let Some(name) = &self.document.filename {
             filename = name.clone();
+            #[allow(clippy::integer_arithmetic)]
             filename.truncate(width / 4);
         }
         let dirty_status = if self.document.is_dirty() {
@@ -264,7 +265,7 @@ impl Editor {
             self.cursor_pos.y.saturating_add(1),
             self.document.len()
         );
-        status = format!("{} - line: {} {}", filename, line_status, dirty_status,);
+        let mut status = format!("{} - line: {} {}", filename, line_status, dirty_status,);
         status.push_str(&" ".repeat(width.saturating_sub(status.len())));
         status.truncate(width);
 
@@ -384,7 +385,7 @@ impl Editor {
 
     fn change_mode(&mut self, mode: Mode) {
         self.mode = mode;
-        match mode {
+        match self.mode {
             Mode::Insert => {
                 print!("{}", cursor::BlinkingBar);
             },
@@ -433,11 +434,12 @@ impl Editor {
         let pressed_key = Terminal::read_key()?;
         match pressed_key {
             Key::Char(c) => match c {
+                'i' => self.change_mode(Mode::Insert),
+                'v' => self.change_mode(Mode::Visual),
                 'h' | 'j' | 'k' | 'l' => self.normal_move_cursor(c),
                 'x' => self.document.delete(&self.cursor_pos),
                 ':' => self.parse_command(),
                 '/' => self.search(),
-                'i' => self.change_mode(Mode::Insert),
                 'o' => {
                     if self.normal_insert_newline() {
                         self.move_cursor_nextline_front();
