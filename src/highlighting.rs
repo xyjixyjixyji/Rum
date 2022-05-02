@@ -11,9 +11,10 @@ pub enum Type {
     MultilineComment,
     PrimaryKeywords,
     SecondaryKeywords,
+    Function,
 }
 
-//TODO: highlight for functions (var.func()) (between '.' and '(')
+//TODO: highlight for functions (var.func()) (between sep and '(')
 
 const COLOR_NUMBER: color::Rgb = color::Rgb(255, 222, 173);
 const COLOR_MATCH: color::Rgb = color::Rgb(38, 139, 210);
@@ -23,6 +24,7 @@ const COLOR_COMMENT: color::Rgb = color::Rgb(46, 139, 87);
 const COLOR_PRIMARYKW: color::Rgb = color::Rgb(221, 160, 221);
 const COLOR_SECONDARYKW: color::Rgb = color::Rgb(255, 250, 205);
 const COLOR_NOCOLOR: color::Rgb = color::Rgb(255, 255, 255);
+const COLOR_FUNCTION: color::Rgb = color::Rgb(0, 229, 238);
 
 impl Type {
     pub fn to_color(self) -> impl color::Color {
@@ -34,7 +36,8 @@ impl Type {
            Type::Comment | Type::MultilineComment => COLOR_COMMENT,
            Type::PrimaryKeywords => COLOR_PRIMARYKW,
            Type::SecondaryKeywords => COLOR_SECONDARYKW,
-           _ => COLOR_NOCOLOR,
+           Type::Function => COLOR_FUNCTION,
+           Type::None => COLOR_NOCOLOR,
         }
     }
 }

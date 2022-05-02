@@ -365,7 +365,7 @@ impl Row {
                 }
             }
 
-            if self.highlight_str(index, &word, chars, hl_type) {
+            if self.highlight_str(index, word, chars, hl_type) {
                 return true;
             }
         }
@@ -400,12 +400,52 @@ impl Row {
         )
     }
 
-    // word: for searching highlight
+    fn highlight_fn(
+        &mut self,
+        index: &mut usize,
+        opts: &HighlightingOptions,
+        c: char,
+        chars: &[char],
+    ) -> bool {
+        if opts.function() && is_func_start(c) {
+            if *index > 0 {
+                let prev_char = chars[*index - 1];
+                if !(is_sep(prev_char)) {
+                    return false;
+                }
+            }
+            if let Some(end) = chars
+                .iter()
+                .skip(*index)
+                .position(|&c| c == '(')
+            {
+                for ch in chars
+                    .iter()
+                    .skip(*index)
+                    .take(end)
+                {
+                    if !is_func_char(*ch) {
+                        return false;
+                    }
+                }
+                for _ in 0..end {
+                    self.highlighting.push(highlighting::Type::Function);
+                }
+                *index += end;
+                return true;
+            }
+        }
+        false
+    }
+
+    // highlight is a consumer model, each highlight function takes in an index
+    // and returns whether it works. During the highlighting, it consumes the 
+    // shared variable **index**, when index reaches the row's end, the hl is over
     #[allow(clippy::indexing_slicing, clippy::integer_arithmetic)]
     pub fn highlight(
         &mut self,
         opts: &HighlightingOptions,
-        word: &Option<String>,
+        word: &Option<String>,   // word: for searching highlight
         start_with_comment: bool,
     ) -> bool {
         let chars: Vec<char> = self.string.chars().collect();
@@ -449,6 +489,7 @@ impl Row {
             }
             in_multi_comment = false;
             if self.highlight_char(&mut index, opts, *c, &chars)
+                || self.highlight_fn(&mut index, opts, *c, &chars)
                 || self.highlight_comment(&mut index, opts, *c, &chars)
                 || self.highlight_primary_keywords(&mut index, opts, &chars)
                 || self.highlight_secondary_keywords(&mut index, opts, &chars)
@@ -495,4 +536,12 @@ impl Row {
 
 fn is_sep(c: char) -> bool {
     c.is_ascii_punctuation() || c.is_ascii_whitespace()
+}
+
+fn is_func_start(c: char) -> bool {
+    c.is_alphabetic() || c == '_'
+}
+
+fn is_func_char(c: char) -> bool {
+    c.is_alphabetic() || c == '_' || c.is_numeric()
 }

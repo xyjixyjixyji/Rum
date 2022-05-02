@@ -156,7 +156,7 @@ impl Document {
         };
         for row in &mut self.rows[..until] {
             start_with_comment = row.highlight(
-                &self.filetype.options(),
+                self.filetype.options(),
                 word,
                 start_with_comment);
         }
