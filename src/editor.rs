@@ -23,7 +23,7 @@ pub enum SearchDirection {
     Backward,
 }
 
-#[derive(Default, Clone)]
+#[derive(Default, Copy, Clone)]
 pub struct Pos {
     pub x: usize,
     pub y: usize,
@@ -390,7 +390,7 @@ impl Editor {
             },
             Mode::Normal => {
                 print!("{}", cursor::BlinkingBlock);
-                self.move_cursor(Key::Left);
+                self.normal_move_cursor('h');
             },
             Mode::Visual => {
                 print!("{}", cursor::SteadyBlock);
@@ -438,6 +438,12 @@ impl Editor {
                 ':' => self.parse_command(),
                 '/' => self.search(),
                 'i' => self.change_mode(Mode::Insert),
+                'o' => {
+                    if self.normal_insert_newline() {
+                        self.move_cursor_nextline_front();
+                        self.change_mode(Mode::Insert);
+                    }
+                }
                 _ => (),
             }
             _ => (),
@@ -445,15 +451,58 @@ impl Editor {
         Ok(())
     }
 
-    // wrapper for move_cursor<char>
+    fn normal_insert_newline(&mut self) -> bool {
+        let mut cur_pos = self.cursor_pos;
+        cur_pos.x = if let Some(row) = self.document.row(cur_pos.y) {
+            row.len()
+        } else {
+            return false;
+        };
+        self.document.insert(&cur_pos, '\n');
+        true
+    }
+
+    // wrapper for move_cursor<char>, and contrain the navigation
+    // e.g. we do not allow navigate to \n (end of line)
     fn normal_move_cursor(&mut self, c: char) {
         match c {
-            'h' => self.move_cursor(Key::Left),
-            'j' => self.move_cursor(Key::Down),
-            'k' => self.move_cursor(Key::Up),
-            'l' => self.move_cursor(Key::Right),
+            'h' => {
+                if self.cursor_pos.x != 0 {
+                    self.move_cursor(Key::Left);
+                }
+            }
+            'j' => {
+                self.move_cursor(Key::Down);
+
+                // not allowing to navigate to \n
+                let Pos {x, y} = self.cursor_pos;
+                if x == self.document.row(y).unwrap().len() {
+                    self.normal_move_cursor('h');
+                }
+            }
+            'k' => {
+                self.move_cursor(Key::Up);
+                
+                let Pos {x, y} = self.cursor_pos;
+                if x == self.document.row(y).unwrap().len() {
+                    self.normal_move_cursor('h');
+                }
+            }
+            'l' => {
+                let Pos {x, y} = self.cursor_pos;
+                if x < self.document.row(y).unwrap().len().saturating_sub(1) {
+                    // we do not allow to navigate to \n
+                    self.move_cursor(Key::Right)
+                }
+            }
             _ => (),
         }
+    }
+
+    fn move_cursor_nextline_front(&mut self) {
+        let mut pos = &mut self.cursor_pos;
+        pos.x = 0;
+        pos.y = pos.y.saturating_add(1);
     }
 
     fn parse_command(&mut self) {

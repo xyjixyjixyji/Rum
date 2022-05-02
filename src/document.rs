@@ -36,7 +36,11 @@ impl Document {
         }
         self.dirty = true;
         if c == '\n' {
-            self.insert_newline(at);
+            if at.x == self.rows[at.y].len() {
+                self.insert_newline_at_end(at.y);
+            } else {
+                self.insert_newline(at);
+            }
         } else if at.y == self.rows.len() {
             let mut row = Row::default();
             row.insert(0, c);
@@ -47,6 +51,14 @@ impl Document {
             row.insert(at.x, c);
         }
         self.unhighlight_rows(at.y);
+    }
+
+    // more efficient (w/o split)
+    pub fn insert_newline_at_end(&mut self, y_at: usize) {
+        if y_at > self.rows.len() {
+            return;
+        }
+        self.rows.insert(y_at.saturating_add(1), Row::default());
     }
 
     pub fn insert_newline(&mut self, at: &Pos) {
