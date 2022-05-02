@@ -13,6 +13,8 @@ pub enum Type {
     SecondaryKeywords,
 }
 
+//TODO: highlight for functions (var.func()) (between '.' and '(')
+
 const COLOR_NUMBER: color::Rgb = color::Rgb(255, 222, 173);
 const COLOR_MATCH: color::Rgb = color::Rgb(38, 139, 210);
 const COLOR_STRING: color::Rgb = color::Rgb(211, 54, 130);

@@ -210,10 +210,16 @@ impl Editor {
 
     fn draw_welcome_messages(&self) {
         self.process_and_print_welcome_msg(format!("Rum Editor -- version {}", VERSION));
+
+        Terminal::clear_current_line();
         println!("~\r");
-        self.process_and_print_welcome_msg(format!("A Vim-like Editor completely in Rust"));
+
+        self.process_and_print_welcome_msg(format!("A Vim-like Editor Completely in Rust"));
         self.process_and_print_welcome_msg(format!("Rum is permanently free and open-source"));
+
+        Terminal::clear_current_line();
         println!("~\r");
+
         self.process_and_print_welcome_msg(format!("Use: <:q> \t to <Exit>"));
         self.process_and_print_welcome_msg(format!("Use: <:wq> \t to <Save>"));
     }
@@ -230,6 +236,7 @@ impl Editor {
         let mut processed_msg = format!("~{}{}", spaces, msg);
         processed_msg.truncate(width);
 
+        Terminal::clear_current_line();
         println!("{}\r", processed_msg);
     }
 
@@ -251,7 +258,7 @@ impl Editor {
                 .row(self.offset.y.saturating_add(term_row as usize))
             {
                 self.draw_row(row);
-            } else if (term_row == height / 3) && self.document.is_empty() {
+            } else if (term_row == height / 2) && self.document.is_empty() {
                 self.draw_welcome_messages();
             } else {
                 println!("~\r");
