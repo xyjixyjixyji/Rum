@@ -1,16 +1,21 @@
 use crate::{document::Document, Row, Terminal};
-use crate::modes::mode::Mode;
 use std::env;
 use std::time::Duration;
 use std::time::Instant;
 use termion::color;
 use termion::event::Key;
+use termion::cursor;
 
 const STATUS_FG_COLOR: color::Rgb = color::Rgb(63, 63, 63);
 const STATUS_BG_COLOR: color::Rgb = color::Rgb(239, 239, 239);
 const VERSION: &str = env!["CARGO_PKG_VERSION"];
 
-const QUIT_TIMES_WITHOUT_SAVING: u8 = 3;
+#[derive(Clone, Copy)]
+pub enum Mode {
+    Normal,
+    Visual,
+    Insert,
+}
 
 #[derive(PartialEq, Clone, Copy)]
 pub enum SearchDirection {
@@ -46,7 +51,6 @@ pub struct Editor {
     offset: Pos,
     document: Document,
     status_message: StatusMessage,
-    quit_times: u8,
     highlighted_word: Option<String>, // used for searching
 }
 
@@ -74,7 +78,6 @@ impl Editor {
             document,
             offset: Pos::default(),
             status_message: StatusMessage::from(init_status),
-            quit_times: QUIT_TIMES_WITHOUT_SAVING,
             highlighted_word: None,
         }
     }
@@ -96,40 +99,12 @@ impl Editor {
     }
 
     fn process_keypress(&mut self) -> Result<(), std::io::Error> {
-        let pressed_key = Terminal::read_key()?;
-        match pressed_key {
-            Key::Ctrl('q') => {
-                if self.quit_times > 0 && self.document.is_dirty() {
-                    self.status_message = StatusMessage::from(format!(
-                        "WARN: Quitting unsaved, {} more times for quitting",
-                        self.quit_times
-                    ));
-                    self.quit_times -= 1;
-                    return Ok(());
-                }
-                self.quit = true;
-            }
-            Key::Ctrl('s') => self.save(),
-            Key::Ctrl('f') => self.search(),
-            Key::Char(c) => {
-                self.document.insert(&self.cursor_pos, c);
-                self.move_cursor(Key::Right);
-            }
-            Key::Delete => self.document.delete(&self.cursor_pos),
-            Key::Backspace => {
-                if self.cursor_pos.x > 0 || self.cursor_pos.y > 0 {
-                    self.move_cursor(Key::Left);
-                    self.document.delete(&self.cursor_pos);
-                }
-            }
-            Key::Up | Key::Down | Key::Left | Key::Right => self.move_cursor(pressed_key),
-            _ => (),
-        }
+        match self.mode {
+            Mode::Normal => self.normal_process_keypress()?,
+            Mode::Insert => self.insert_process_keypress()?,
+            Mode::Visual => (),
+        };
         self.scroll();
-        if self.quit_times < QUIT_TIMES_WITHOUT_SAVING {
-            self.quit_times = QUIT_TIMES_WITHOUT_SAVING;
-            self.status_message = StatusMessage::from(String::new());
-        }
         Ok(())
     }
 
@@ -197,16 +172,16 @@ impl Editor {
         let mut direction = SearchDirection::Forward;
         let query = self
             .prompt(
-                "Search (ESC-cancel, Arrows-navigate): ",
+                "/",
             |editor, key, query| {
                 let mut moved: bool = false;
                 match key {
-                    Key::Right | Key::Down => {
+                    Key::Char('n') => {
                         direction = SearchDirection::Forward;
                         editor.move_cursor(Key::Right);
                         moved = true;
                     },
-                    Key::Left | Key::Up => {
+                    Key::Char('N') => {
                         direction = SearchDirection::Backward;
                     },
                     _ => direction = SearchDirection::Forward,
@@ -382,21 +357,125 @@ impl Editor {
         }
     }
 
+    fn quit(&mut self, force: bool) {
+        if self.document.is_dirty() && !force {
+            self.set_status_message("File unsaved, use (:q! to force quit)");
+            return;
+        }
+        self.quit = true;
+    }
+
     fn save(&mut self) {
         if self.document.filename.is_none() {
             let new_name = self.prompt("Save as: ", |_, _, _| {}).unwrap_or(None);
             if new_name.is_none() {
-                self.status_message = StatusMessage::from("Save aborted".to_string());
+                self.set_status_message("Save aborted");
                 return;
             }
             self.document.filename = new_name;
         }
 
         if self.document.save().is_ok() {
-            self.status_message = StatusMessage::from("File saved successfully".to_string());
+            self.set_status_message("File saved successfully");
         } else {
-            self.status_message = StatusMessage::from("Failed to save file".to_string());
+            self.set_status_message("Failed to save file");
         }
+    }
+
+    fn change_mode(&mut self, mode: Mode) {
+        self.mode = mode;
+        match mode {
+            Mode::Insert => {
+                print!("{}", cursor::BlinkingBar);
+            },
+            Mode::Normal => {
+                print!("{}", cursor::BlinkingBlock);
+                self.move_cursor(Key::Left);
+            },
+            Mode::Visual => {
+                print!("{}", cursor::SteadyBlock);
+            },
+        }
+    }
+
+    // ========================================================
+    // |                                                      |
+    // |                     INSERT MODE                      |
+    // |                                                      |
+    // ========================================================
+    fn insert_process_keypress(&mut self) -> Result<(), std::io::Error> {
+        let pressed_key = Terminal::read_key()?;
+        match pressed_key {
+            Key::Char(c) => {
+                self.document.insert(&self.cursor_pos, c);
+                self.move_cursor(Key::Right);
+            },
+            Key::Delete => self.document.delete(&self.cursor_pos),
+            Key::Backspace => {
+                if self.cursor_pos.x > 0 || self.cursor_pos.y > 0 {
+                    self.move_cursor(Key::Left);
+                    self.document.delete(&self.cursor_pos);
+                }
+            },
+            Key::Up | Key::Down | Key::Left | Key::Right => self.move_cursor(pressed_key),
+            Key::Esc => self.change_mode(Mode::Normal),
+            _ => ()
+        }
+        Ok(())
+    }
+
+    // ========================================================
+    // |                                                      |
+    // |                     NORMAL MODE                      |
+    // |                                                      |
+    // ========================================================
+    fn normal_process_keypress(&mut self) -> Result<(), std::io::Error> {
+        let pressed_key = Terminal::read_key()?;
+        match pressed_key {
+            Key::Char(c) => match c {
+                'h' | 'j' | 'k' | 'l' => self.normal_move_cursor(c),
+                'x' => self.document.delete(&self.cursor_pos),
+                ':' => self.parse_command(),
+                '/' => self.search(),
+                'i' => self.change_mode(Mode::Insert),
+                _ => (),
+            }
+            _ => (),
+        }
+        Ok(())
+    }
+
+    // wrapper for move_cursor<char>
+    fn normal_move_cursor(&mut self, c: char) {
+        match c {
+            'h' => self.move_cursor(Key::Left),
+            'j' => self.move_cursor(Key::Down),
+            'k' => self.move_cursor(Key::Up),
+            'l' => self.move_cursor(Key::Right),
+            _ => (),
+        }
+    }
+
+    fn parse_command(&mut self) {
+        let cmd = self
+            .prompt(":", |_, _, _|{})
+            .unwrap_or(None);
+        if let Some(cmd) = cmd {
+            match &cmd as &str {
+                "w" => self.save(),
+                "q" => self.quit(false),
+                "q!" => self.quit(true),
+                "wq" => {
+                    self.save();
+                    self.quit(false);
+                }
+                _ => self.set_status_message("Unknown command!")
+            }
+        }
+    }
+
+    fn set_status_message(&mut self, msg: &str) {
+        self.status_message = StatusMessage::from(msg.to_string());
     }
 }
 

@@ -13,7 +13,6 @@ mod row;
 mod document;
 mod filetype;
 mod highlighting;
-mod modes; // different modes for Rum
 
 use editor::Editor;
 pub use editor::{Pos, SearchDirection};
