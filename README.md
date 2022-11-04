@@ -7,4 +7,4 @@ I found Rust is an elegent and efficient language, and writing a vim-like editor
 ## Roadmap
 
 - [x] mode transition
-- [] customize using yaml file 
+- [] customize using toml
